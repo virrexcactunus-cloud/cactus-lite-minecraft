@@ -16,6 +16,7 @@ from tkinter import filedialog, messagebox, ttk
 
 import minecraft_launcher_lib as mll
 import mod_catalog
+import skin_pack
 
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -30,13 +31,31 @@ else:
 ICON_ICO = os.path.join(APP_DIR, "icon.ico")
 ICON_PNG = os.path.join(APP_DIR, "icon.png")
 APP_NAME = "Cactus Lite Minecraft"
-APP_VERSION = "v1.2"
+APP_VERSION = "v1.3"
 MC_DIR = os.path.join(os.path.expanduser("~"), ".mcl")
 SETTINGS_PATH = os.path.join(MC_DIR, "settings.json")
 SKIN_DIR = os.path.join(MC_DIR, "skins")
-SKIN_PACK = "MC Lite Skin"
+PLAYTIME_PATH = os.path.join(MC_DIR, "playtime.json")
+SKIN_PACK = skin_pack.SKIN_PACK
 
 CHANGELOG = [
+    {
+        "version": "v1.3",
+        "fixes": [
+            "Поиск модов теперь действительно виден и работает — страница «Моды» показывала его только после выбора подсистемы",
+            "Страница «Моды» прокручивается колесом мыши даже над плитками",
+            "Скин: ресурспак теперь работает на всех версиях — 1.6–1.7 получают скин 64×32, на 1.21.9+ скин подставляется во все текстуры игроков",
+            "Скин на 1.21.11 больше не пропадает — исправлены pack.mcmeta и пути к текстурам",
+            "Старые версии (1.7–1.16) запускаются на подходящей Java, а не на самой новой",
+        ],
+        "features": [
+            "Большие плитки каталога во всю ширину страницы",
+            "Каталог показывает только моды, совместимые с выбранной подсистемой",
+            "Поиск Modrinth: фильтр по Forge / Fabric / NeoForge и сортировка совместимых с выбранной версией",
+            "Счётчик времени в игре на главной",
+            "Предпросмотр скина в «Дополнительных»",
+        ],
+    },
     {
         "version": "v1.2",
         "fixes": [],
@@ -198,60 +217,14 @@ def hide_console():
 
 
 def version_supports_skin(version):
-    v = (version or "").lower()
-    if v.startswith(("a", "b", "c")) or not re.match(r"\d+\.\d+", v):
-        return False
-    major, minor = int(v.split(".")[0]), int(v.split(".")[1])
-    if major == 1:
-        return minor >= 6
-    return major >= 2
+    return skin_pack.version_supports_skin(version)
 
 
 def pack_format_for(version):
-    m = re.match(r"(\d+)\.(\d+)(?:\.(\d+))?", version or "")
-    if not m:
-        return 15
-    major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
-    if major == 1:
-        if minor <= 8:
-            return 1
-        if minor <= 12:
-            return 3
-        if minor <= 14:
-            return 4
-        if minor == 15:
-            return 5
-        if minor == 16:
-            return 6
-        if minor == 17:
-            return 7
-        if minor == 18:
-            return 8
-        if minor == 19:
-            return 9 if patch <= 2 else (12 if patch == 3 else 13)
-        if minor == 20:
-            if patch <= 1:
-                return 15
-            if patch == 2:
-                return 18
-            if patch <= 4:
-                return 22
-            if patch <= 6:
-                return 32
-            return 32
-        if minor == 21:
-            if patch <= 1:
-                return 34
-            if patch <= 3:
-                return 42
-            if patch == 4:
-                return 46
-            return 55
-        return 55
-    return 55
+    return skin_pack.pack_format_for(version)
 
 
-def find_java():
+def find_java_candidates():
     cands = []
     try:
         for info in mll.java_utils.find_system_java_versions_information():
@@ -301,9 +274,12 @@ def find_java():
             except Exception:
                 pass
             cands.append((c, v))
+    return cands
 
+
+def find_java():
     best = None
-    for c, v in cands:
+    for c, v in find_java_candidates():
         if best is None or (best[1] or 0) < (v or 0):
             best = (c, v)
     return best
@@ -333,6 +309,8 @@ class App:
         self._last_ram_label = ""
         os.makedirs(MC_DIR, exist_ok=True)
         self.settings = self._load_settings()
+        self._playtime_total = self._load_playtime()
+        self._session_start = None
         self._loader_compat = load_compat_cache() or {}
         self._version_ids = []
         self._cur_version_id = self.settings.get("version", "")
@@ -378,6 +356,12 @@ class App:
                   selectbackground=[("readonly", BG2)], selectforeground=[("readonly", FG)])
         style.configure("TProgressbar", troughcolor=BG2, background=ACCENT, bordercolor=BG,
                         lightcolor=ACCENT, darkcolor=ACCENT)
+        style.configure("Mods.Vertical.TScrollbar", troughcolor=BG, background=BG3,
+                        bordercolor=BG, arrowcolor=MUTED, lightcolor=BG3, darkcolor=BG3,
+                        relief="flat", borderwidth=0, arrowsize=12, width=10)
+        style.map("Mods.Vertical.TScrollbar",
+                  background=[("active", MUTED), ("pressed", MUTED)],
+                  arrowcolor=[("active", FG)])
 
     def _build_ui(self):
         base = tk.Frame(self.root, bg=BG)
@@ -406,12 +390,13 @@ class App:
 
         tk.Frame(self.sidebar, bg=BG2).pack(fill="both", expand=True)
 
-        btn = tk.Button(self.sidebar, text="\u2261  Изменения", anchor="w", padx=14, pady=11,
-                        bg=BG2, fg=FG, activebackground=BG3, activeforeground=FG,
-                        relief="flat", bd=0, font=(FONT, 10), cursor="hand2",
-                        command=lambda: self._show_page("changelog"))
-        btn.pack(fill="x")
-        self.nav_buttons.append((btn, "changelog"))
+        self.changelog_btn = tk.Button(self.sidebar, text="≡  Изменения", anchor="w", padx=14, pady=9,
+                                       bg=BG2, fg=FG, activebackground=BG3, activeforeground=FG,
+                                       relief="flat", bd=0, font=(FONT, 10), cursor="hand2",
+                                       command=lambda: self._show_page("changelog"))
+        self.changelog_btn.pack(fill="x")
+        self.nav_buttons.append((self.changelog_btn, "changelog"))
+
 
         tk.Label(self.sidebar, text=f"by cactunus {APP_VERSION}", font=(FONT, 8), fg=MUTED, bg=BG2)\
             .pack(fill="x", pady=(6, 10))
@@ -436,6 +421,8 @@ class App:
             btn.config(fg=ACCENT if p == page else FG)
         if page == "mods":
             self._refresh_mods_page()
+        if page == "extra":
+            self._render_skin_preview()
         self.pages[page].tkraise()
 
     def _build_home_page(self, parent):
@@ -482,6 +469,10 @@ class App:
                                      anchor="w", justify="left", wraplength=420)
         self.status_label.pack(fill="x", padx=20, pady=(12, 0))
 
+        self.playtime_var = tk.StringVar(value=self._fmt_playtime(self._playtime_total))
+        tk.Label(body, textvariable=self.playtime_var, font=(FONT, 9), fg=ACCENT, bg=BG,
+                 anchor="w").pack(fill="x", padx=20, pady=(6, 0))
+
         self.log_btn = tk.Button(body, text="журнал", font=(FONT, 8), fg=MUTED, bg=BG3,
                                  activebackground=BG2, activeforeground=FG, relief="flat", bd=0,
                                  cursor="hand2", command=self.toggle_console)
@@ -514,6 +505,13 @@ class App:
                              activebackground=BG2, activeforeground=FG, relief="flat", bd=0,
                              cursor="hand2", command=self._reset_skin)
         skin_btn.pack(anchor="w", padx=20, ipadx=10, ipady=5, pady=(8, 0))
+
+        tk.Label(page, text="ПРЕДПРОСМОТР СКИНА", font=(FONT, 9), fg=MUTED, bg=BG)\
+            .pack(anchor="w", padx=20, pady=(18, 4))
+        self.skin_preview = tk.Canvas(page, width=112, height=168, bg=BG2,
+                                      highlightthickness=1, highlightbackground=BG3)
+        self.skin_preview.pack(anchor="w", padx=20, pady=(0, 4))
+        self._render_skin_preview()
 
         tk.Label(page, text="ПОДСИСТЕМА МОДОВ", font=(FONT, 9), fg=MUTED, bg=BG)\
             .pack(anchor="w", padx=20, pady=(18, 5))
@@ -554,16 +552,20 @@ class App:
 
         self._mods_center = tk.Frame(page, bg=BG)
         canvas = tk.Canvas(self._mods_center, bg=BG, highlightthickness=0)
-        sb = ttk.Scrollbar(self._mods_center, orient="vertical", command=canvas.yview)
+        sb = ttk.Scrollbar(self._mods_center, orient="vertical", command=canvas.yview,
+                           style="Mods.Vertical.TScrollbar")
         inner = tk.Frame(canvas, bg=BG)
         self._mods_inner = inner
         win = canvas.create_window((0, 0), window=inner, anchor="nw")
         inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
-        canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
+        self._mods_canvas = canvas
+        self._mods_window = win
+        canvas.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
-        self._mods_canvas = canvas
+        self._last_catalog_cols = 0
+        canvas.bind("<Configure>", self._on_mods_canvas_resize)
+        self._bind_mods_wheel(canvas)
 
         self._mods_status_var = tk.StringVar(value="")
         self._mods_block = tk.Frame(inner, bg=BG2, highlightthickness=2, highlightbackground=BG3)
@@ -587,6 +589,47 @@ class App:
         tk.Button(self._mods_block, text="ЗАГРУЗИТЬ ВРУЧНУЮ", font=(FONT, 9, "bold"), fg="#06130b",
                   bg=ACCENT, activebackground=ACCENT_DARK, activeforeground="#06130b", relief="flat",
                   bd=0, cursor="hand2", command=self._pick_mod).pack(pady=(0, 16), ipadx=12, ipady=5)
+
+        tk.Label(inner, text="ПОИСК МОДОВ НА MODRINTH", font=(FONT, 9, "bold"), fg=FG, bg=BG)\
+            .pack(anchor="w", padx=20, pady=(16, 2))
+        search_row = tk.Frame(inner, bg=BG)
+        search_row.pack(fill="x", padx=20, pady=(2, 0))
+        self._search_var = tk.StringVar()
+        search_entry = tk.Entry(search_row, textvariable=self._search_var, font=(FONT, 9),
+                                 bg=BG3, fg=FG, insertbackground=FG, relief="flat")
+        search_entry.pack(side="left", fill="x", expand=True, ipady=7, ipadx=8)
+        search_entry.bind("<Return>", lambda e: self._search_mods())
+        tk.Button(search_row, text="НАЙТИ", font=(FONT, 9, "bold"), fg="#06130b",
+                  bg=ACCENT, activebackground=ACCENT_DARK, activeforeground="#06130b",
+                  relief="flat", bd=0, cursor="hand2",
+                  command=self._search_mods).pack(side="left", padx=(8, 0), ipadx=10, ipady=5)
+        filter_row = tk.Frame(inner, bg=BG)
+        filter_row.pack(fill="x", padx=20, pady=(4, 0))
+        tk.Label(filter_row, text="Подсистема:", font=(FONT, 8), fg=MUTED, bg=BG)\
+            .pack(side="left")
+        saved_loader = self.settings.get("loader", "none")
+        search_loader_vals = ["Все", "Forge", "Fabric", "NeoForge"]
+        search_loader_ids = ["all", "forge", "fabric", "neoforge"]
+        self._search_loader_var = tk.StringVar(
+            value=search_loader_vals[search_loader_ids.index(saved_loader)] if saved_loader in search_loader_ids else "Все")
+        sl = ttk.Combobox(filter_row, textvariable=self._search_loader_var, values=search_loader_vals,
+                          state="readonly", font=(FONT, 8), width=9)
+        sl.pack(side="left", padx=(6, 12))
+        self._search_loader_ids = search_loader_ids
+        self._search_loader_vals = search_loader_vals
+        tk.Label(filter_row, text="Сортировка:", font=(FONT, 8), fg=MUTED, bg=BG).pack(side="left")
+        self._search_sort_var = tk.StringVar(value="Популярные")
+        ss = ttk.Combobox(filter_row, textvariable=self._search_sort_var,
+                          values=["Популярные", "Совместимые", "Новые"],
+                          state="readonly", font=(FONT, 8), width=12)
+        ss.pack(side="left", padx=(6, 0))
+        self._search_status_var = tk.StringVar(value="")
+        tk.Label(inner, textvariable=self._search_status_var, font=(FONT, 8), fg=ACCENT, bg=BG)\
+            .pack(anchor="w", padx=20, pady=(6, 0))
+        self._search_grid = tk.Frame(inner, bg=BG)
+        self._search_grid.pack(fill="x", padx=12, pady=(2, 0))
+        self._search_tile_state = {}
+        self._search_avatars = []
 
         tk.Label(inner,
                  text="Мы не ручаемся за ошибки при таком переносе, если мод не подойдёт\n"
@@ -627,26 +670,6 @@ class App:
         self._tile_state = {}
         self._catalog_data = {}
 
-        tk.Label(inner, text="ПОИСК МОДОВ НА MODRINTH", font=(FONT, 9, "bold"), fg=FG, bg=BG)\
-            .pack(anchor="w", padx=20, pady=(20, 2))
-        search_row = tk.Frame(inner, bg=BG)
-        search_row.pack(fill="x", padx=20, pady=(2, 0))
-        self._search_var = tk.StringVar()
-        search_entry = tk.Entry(search_row, textvariable=self._search_var, font=(FONT, 9),
-                                 bg=BG3, fg=FG, insertbackground=FG, relief="flat")
-        search_entry.pack(side="left", fill="x", expand=True, ipady=5, ipadx=6)
-        search_entry.bind("<Return>", lambda e: self._search_mods())
-        tk.Button(search_row, text="НАЙТИ", font=(FONT, 9, "bold"), fg="#06130b",
-                  bg=ACCENT, activebackground=ACCENT_DARK, activeforeground="#06130b",
-                  relief="flat", bd=0, cursor="hand2",
-                  command=self._search_mods).pack(side="left", padx=(8, 0), ipadx=10, ipady=5)
-        self._search_status_var = tk.StringVar(value="")
-        tk.Label(inner, textvariable=self._search_status_var, font=(FONT, 8), fg=ACCENT, bg=BG)\
-            .pack(anchor="w", padx=20, pady=(6, 0))
-        self._search_grid = tk.Frame(inner, bg=BG)
-        self._search_grid.pack(fill="x", padx=12, pady=(2, 0))
-        self._search_tile_state = {}
-        self._search_avatars = []
 
         self._installed_header_var = tk.StringVar(value="УСТАНОВЛЕННЫЕ МОДЫ")
         tk.Label(inner, textvariable=self._installed_header_var, font=(FONT, 9, "bold"), fg=FG, bg=BG)\
@@ -660,18 +683,76 @@ class App:
             .pack(pady=(12, 12))
         return page
 
+    def _bind_wheel_recursive(self, widget, canvas):
+        # Колесо мыши обрабатывается одним глобальным обработчиком (_bind_mods_wheel),
+        # поэтому отдельные привязки к каждому виджету больше не нужны.
+        return
+
+    def _bind_mods_wheel(self, canvas):
+        def on_wheel(e):
+            try:
+                root_path = str(self._mods_center)
+                widget_path = str(e.widget)
+            except Exception:
+                return None
+            if widget_path != root_path and not widget_path.startswith(root_path + "."):
+                return None
+            try:
+                if not canvas.winfo_exists():
+                    return None
+                first, last = canvas.yview()
+            except Exception:
+                return None
+            if first <= 0.0 and last >= 1.0:
+                return "break"
+            num = getattr(e, "num", 0)
+            if num == 4:
+                step = -3
+            elif num == 5:
+                step = 3
+            else:
+                delta = getattr(e, "delta", 0) or 0
+                if delta == 0:
+                    return "break"
+                if abs(delta) >= 120:
+                    step = -int(delta / 120) * 3
+                else:
+                    step = -int(delta) * 3
+                    if step == 0:
+                        step = -1 if delta > 0 else 1
+            try:
+                canvas.yview_scroll(step, "units")
+            except Exception:
+                pass
+            return "break"
+
+        self._mods_wheel_handler = on_wheel
+        for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+            try:
+                self.root.bind_all(seq, on_wheel, add="+")
+            except Exception:
+                pass
+
+    def _on_mods_canvas_resize(self, e=None):
+        win = getattr(self, "_mods_window", None)
+        if e is not None and win is not None:
+            try:
+                self._mods_canvas.itemconfigure(win, width=e.width)
+            except Exception:
+                pass
+        cols = self._flow_columns()
+        if cols != getattr(self, "_last_catalog_cols", 0):
+            self._last_catalog_cols = cols
+            if getattr(self, "_catalog_data", None):
+                self._rebuild_catalog()
+
     def _refresh_mods_page(self):
         if not hasattr(self, "_mods_center"):
             return
-        has_loader = self.settings.get("loader", "none") != "none"
-        if has_loader:
-            self._mods_empty.pack_forget()
-            self._mods_center.pack(fill="both", expand=True)
-            self._refresh_installed_mods()
-            self._load_catalog_async()
-        else:
-            self._mods_center.pack_forget()
-            self._mods_empty.pack(fill="both", expand=True)
+        self._mods_empty.pack_forget()
+        self._mods_center.pack(fill="both", expand=True)
+        self._refresh_installed_mods()
+        self._load_catalog_async()
 
     def _mods_dir(self):
         version = self._current_version()
@@ -777,43 +858,68 @@ class App:
             self._catalog_state_var.set("Каталог пуст или не загрузился.")
             return
         cur_series = mod_catalog.series_of(self._current_version())
+        loader = self.settings.get("loader", "none")
+        mods = [m for m in mod_catalog.CATALOG
+                if loader == "none" or loader in (m.get("loaders") or [])
+                or (m.get("id") == "optifine" and loader in ("forge", "none"))
+                or m.get("id") in ("sodium", "zoomify", "voxy")]
+        cols = self._flow_columns()
+        for c in range(12):
+            if c < cols:
+                self._catalog_grid.grid_columnconfigure(c, weight=1, uniform="tile")
+            else:
+                self._catalog_grid.grid_columnconfigure(c, weight=0, uniform="")
         count = 0
-        for i, mod in enumerate(mod_catalog.CATALOG):
+        for mod in mods:
             versions = data.get(mod["id"]) or {}
-            if not versions:
-                continue
+            i = count
             count += 1
             tile = tk.Frame(self._catalog_grid, bg=BG2, highlightthickness=1,
-                            highlightbackground=BG3, width=176, height=168)
-            tile.grid(row=i // 2, column=i % 2, padx=8, pady=(10, 0), sticky="n")
+                            highlightbackground=BG3, width=300, height=116)
+            tile.grid(row=i // cols, column=i % cols, padx=8, pady=(10, 0), sticky="new")
             tile.grid_propagate(False)
             tile.pack_propagate(False)
 
-            avatar = tk.Canvas(tile, width=44, height=44, bg=BG2, highlightthickness=0)
-            avatar.pack(pady=(12, 4))
+            avatar = tk.Canvas(tile, width=48, height=48, bg=BG2, highlightthickness=0)
+            avatar.pack(side="left", padx=(12, 10), pady=12)
+            info = tk.Frame(tile, bg=BG2)
+            info.pack(side="left", fill="both", expand=True, padx=(0, 12), pady=10)
             photo = self._mod_icon_photo(mod.get("icon_b64"))
             if photo is not None:
-                avatar.create_image(22, 22, image=photo)
+                avatar.create_image(24, 24, image=photo)
             else:
-                avatar.create_rectangle(2, 2, 42, 42, fill=mod["color"], outline=mod["color"])
-                avatar.create_text(22, 22, text=mod["name"][0], fill="#ffffff",
+                avatar.create_rectangle(2, 2, 46, 46, fill=mod["color"], outline=mod["color"])
+                avatar.create_text(24, 24, text=mod["name"][0], fill="#ffffff",
                                    font=(FONT, 16, "bold"))
 
-            tk.Label(tile, text=mod["name"], font=(FONT, 10, "bold"), fg=FG, bg=BG2).pack()
-            tk.Label(tile, text=mod["note"], font=(FONT, 7), fg=MUTED, bg=BG2).pack(pady=(1, 6))
+            tk.Label(info, text=mod["name"], font=(FONT, 11, "bold"), fg=FG, bg=BG2,
+                     anchor="w").pack(fill="x")
+            tk.Label(info, text=mod["note"], font=(FONT, 8), fg=MUTED, bg=BG2,
+                     wraplength=230, justify="left", anchor="w").pack(fill="x", pady=(1, 6))
 
-            bottom = tk.Frame(tile, bg=BG2)
-            bottom.pack(fill="x", padx=10, pady=(0, 10))
+            bottom = tk.Frame(info, bg=BG2)
+            bottom.pack(fill="x", pady=(0, 2))
             series_keys = sorted(versions, key=mod_catalog.version_sort_key, reverse=True)
-            labels = [v + (" (рекомендовано)" if mod_catalog.matches_series(v, cur_series) else "")
-                      for v in series_keys]
+            labels = []
+            for v in series_keys:
+                loaders = (versions.get(v) or {}).get("loaders") or []
+                if not loaders:
+                    letters = " ".join(LOADER_LETTERS[l] for l in LOADER_IDS if l in self._compat_for(v))
+                else:
+                    letters = " ".join(LOADER_LETTERS.get(l, "") for l in loaders if l in LOADER_LETTERS)
+                label = v + ((" " + letters.strip()) if letters.strip() else "")
+                if mod_catalog.matches_series(v, cur_series):
+                    label += " (рекомендовано)"
+                labels.append(label)
             var = tk.StringVar()
             state = {"button": None, "var": var, "keys": series_keys,
                      "busy": False, "name": mod["name"]}
             self._tile_state[mod["id"]] = state
             cb = ttk.Combobox(bottom, textvariable=var, values=labels, state="readonly",
-                              font=(FONT, 8), width=9)
+                              font=(FONT, 9), width=17, height=25)
             cb.pack(side="left")
+            state["cb"] = cb
+            state["labels"] = labels
             if labels:
                 idx = next((k for k, v in enumerate(series_keys)
                             if mod_catalog.matches_series(v, cur_series)), 0)
@@ -822,14 +928,30 @@ class App:
                 cb.config(state="disabled")
             btn = tk.Button(bottom, text="УСТАНОВИТЬ", font=(FONT, 8, "bold"), fg="#06130b",
                             bg=ACCENT, activebackground=ACCENT_DARK, activeforeground="#06130b",
-                            relief="flat", bd=0, cursor="hand2", width=9,
+                            relief="flat", bd=0, cursor="hand2", width=8,
                             command=lambda mid=mod["id"]: self._install_catalog_mod(mid))
             btn.pack(side="right")
             state["button"] = btn
+        self._bind_wheel_recursive(self._catalog_grid, self._mods_canvas)
         if not count:
             self._catalog_state_var.set("Каталог пуст или не загрузился.")
             return
         self._catalog_state_var.set("")
+
+    def _flow_columns(self):
+        try:
+            width = self._mods_canvas.winfo_width()
+        except Exception:
+            width = 0
+        if width < 60:
+            try:
+                width = self._catalog_grid.winfo_width()
+            except Exception:
+                width = 0
+        if width < 60:
+            width = 660
+        cols = max(1, (width - 24) // (320 + 16))
+        return cols
 
     def _mod_icon_photo(self, b64):
         if not b64:
@@ -839,7 +961,7 @@ class App:
             import io
             from PIL import Image, ImageTk
             img = Image.open(io.BytesIO(base64.b64decode(b64))).convert("RGBA")
-            img = img.resize((44, 44), Image.LANCZOS)
+            img = img.resize((46, 46), Image.LANCZOS)
             photo = ImageTk.PhotoImage(img)
         except Exception:
             try:
@@ -857,7 +979,10 @@ class App:
         if not label:
             messagebox.showinfo(APP_NAME, "Для этой версии мод недоступен.")
             return
-        series = label.split(" (")[0]
+        m = re.match(r"(\d+\.\d+(?:\.\d+)?)", label)
+        if not m:
+            return
+        series = m.group(1)
         info = (self._catalog_data.get(mod_id) or {}).get(series)
         if not info:
             return
@@ -1019,18 +1144,34 @@ class App:
     def _search_mods(self):
         query = self._search_var.get().strip()
         if not query:
+            for w in self._search_grid.winfo_children():
+                w.destroy()
+            self._search_tile_state = {}
+            self._search_avatars = []
+            self._search_status_var.set("")
             return
         if getattr(self, "_search_loading", False):
             return
         self._search_loading = True
         self._search_status_var.set("Поиск...")
-        loader = self.settings.get("loader", "none")
-        loader = loader if loader in ("forge", "fabric", "neoforge") else None
-        threading.Thread(target=self._search_worker, args=(query, loader), daemon=True).start()
+        sl_id = self._search_loader_var.get()
+        loader = self._search_loader_ids[self._search_loader_vals.index(sl_id)] if sl_id in self._search_loader_vals else "all"
+        sort = self._search_sort_var.get()
+        index = "relevance"
+        if sort == "Новые":
+            index = "newest"
+        elif sort == "Совместимые":
+            index = "relevance"
+        series = mod_catalog.series_of(self._current_version())
+        if not series:
+            series = None
+        threading.Thread(target=self._search_worker,
+                         args=(query, loader, index, series), daemon=True).start()
 
-    def _search_worker(self, query, loader):
+    def _search_worker(self, query, loader, index, series):
         try:
-            results = mod_catalog.search_modrinth_mods(query, loader=loader)
+            results = mod_catalog.search_modrinth_mods(
+                query, loader=loader, index=index, series=series)
         except Exception:
             results = []
         self._search_loading = False
@@ -1045,44 +1186,106 @@ class App:
             self._search_status_var.set("Ничего не найдено.")
             return
         self._search_status_var.set(f"Найдено: {len(results)}")
+        cols = self._flow_columns()
+        for c in range(12):
+            if c < cols:
+                self._search_grid.grid_columnconfigure(c, weight=1, uniform="stile")
+            else:
+                self._search_grid.grid_columnconfigure(c, weight=0, uniform="")
         cur_series = mod_catalog.series_of(self._current_version())
         for i, mod in enumerate(results):
             tile = tk.Frame(self._search_grid, bg=BG2, highlightthickness=1,
-                            highlightbackground=BG3, width=176, height=168)
-            tile.grid(row=i // 2, column=i % 2, padx=8, pady=(10, 0), sticky="n")
+                            highlightbackground=BG3, width=300, height=116)
+            tile.grid(row=i // cols, column=i % cols, padx=8, pady=(10, 0), sticky="new")
             tile.grid_propagate(False)
             tile.pack_propagate(False)
 
-            avatar = tk.Canvas(tile, width=44, height=44, bg=BG2, highlightthickness=0)
-            avatar.pack(pady=(12, 4))
+            avatar = tk.Canvas(tile, width=48, height=48, bg=BG2, highlightthickness=0)
+            avatar.pack(side="left", padx=(12, 10), pady=12)
+            info = tk.Frame(tile, bg=BG2)
+            info.pack(side="left", fill="both", expand=True, padx=(0, 12), pady=10)
             photo = self._net_icon_photo(mod.get("icon_url"), self._search_avatars)
             if photo is not None:
-                avatar.create_image(22, 22, image=photo)
+                avatar.create_image(24, 24, image=photo)
             else:
-                avatar.create_rectangle(2, 2, 42, 42, fill=mod["color"], outline=mod["color"])
-                avatar.create_text(22, 22, text=(mod["name"][:1] or "?"), fill="#ffffff",
+                avatar.create_rectangle(2, 2, 46, 46, fill=mod["color"], outline=mod["color"])
+                avatar.create_text(24, 24, text=(mod["name"][:1] or "?"), fill="#ffffff",
                                    font=(FONT, 16, "bold"))
 
-            tk.Label(tile, text=mod["name"][:16], font=(FONT, 10, "bold"), fg=FG, bg=BG2).pack()
-            tk.Label(tile, text=mod["note"] or " ", font=(FONT, 7), fg=MUTED, bg=BG2,
-                     wraplength=160, justify="center").pack(pady=(1, 6))
+            name = mod["name"]
+            if mod.get("compatible"):
+                name += " ✓"
+            tk.Label(info, text=name[:26], font=(FONT, 11, "bold"), fg=FG, bg=BG2,
+                     anchor="w").pack(fill="x")
+            tk.Label(info, text=mod["note"] or " ", font=(FONT, 8), fg=MUTED, bg=BG2,
+                     wraplength=230, justify="left", anchor="w").pack(fill="x", pady=(1, 6))
 
-            bottom = tk.Frame(tile, bg=BG2)
-            bottom.pack(fill="x", padx=10, pady=(0, 10))
+            bottom = tk.Frame(info, bg=BG2)
+            bottom.pack(fill="x", pady=(0, 2))
             var = tk.StringVar()
             state = {"button": None, "var": var, "keys": [], "busy": False, "name": mod["name"],
                      "mod": mod}
             self._search_tile_state[mod["id"]] = state
-            cb = ttk.Combobox(bottom, textvariable=var, values=[], state="readonly",
-                              font=(FONT, 8), width=9)
+            cb = ttk.Combobox(bottom, textvariable=var, values=["загрузка..."], state="readonly",
+                              font=(FONT, 9), width=17, height=25)
+            var.set("загрузка...")
             cb.config(state="disabled")
             cb.pack(side="left")
+            state["cb"] = cb
+            state["labels"] = []
             btn = tk.Button(bottom, text="УСТАНОВИТЬ", font=(FONT, 8, "bold"), fg="#06130b",
                             bg=ACCENT, activebackground=ACCENT_DARK, activeforeground="#06130b",
-                            relief="flat", bd=0, cursor="hand2", width=9,
+                            relief="flat", bd=0, cursor="hand2", width=8,
                             command=lambda mid=mod["id"], m=mod: self._install_search_mod(mid, m))
             btn.pack(side="right")
             state["button"] = btn
+            threading.Thread(target=self._search_versions_worker,
+                             args=(mod["id"], mod, cur_series), daemon=True).start()
+        self._bind_wheel_recursive(self._search_grid, self._mods_canvas)
+
+    def _search_versions_worker(self, mod_id, mod, cur_series):
+        try:
+            versions = mod_catalog.fetch_modrinth_project_versions(mod["project"])
+        except Exception:
+            versions = {}
+        self.root.after(0, lambda: self._fill_search_versions(mod_id, versions, cur_series))
+
+    def _fill_search_versions(self, mod_id, versions, cur_series):
+        state = self._search_tile_state.get(mod_id)
+        if not state:
+            return
+        cb = state.get("cb")
+        try:
+            if cb is None or not cb.winfo_exists():
+                return
+        except Exception:
+            return
+        keys = sorted(versions, key=mod_catalog.version_sort_key, reverse=True)
+        labels = []
+        for v in keys:
+            loaders = (versions.get(v) or {}).get("loaders") or []
+            letters = " ".join(LOADER_LETTERS.get(l, "") for l in loaders if l in LOADER_LETTERS)
+            label = v + ((" " + letters.strip()) if letters.strip() else "")
+            if mod_catalog.matches_series(v, cur_series):
+                label += " (рекомендовано)"
+            labels.append(label)
+        state["keys"] = keys
+        state["labels"] = labels
+        if not labels:
+            state["var"].set("нет версий")
+            cb.config(values=[], state="disabled")
+            return
+        cb.config(values=labels, state="readonly")
+        idx = next((k for k, v in enumerate(keys) if mod_catalog.matches_series(v, cur_series)), 0)
+        state["var"].set(labels[idx])
+
+    def _selected_series(self, state):
+        keys = state.get("keys") or []
+        labels = state.get("labels") or []
+        try:
+            return keys[labels.index(state["var"].get())]
+        except Exception:
+            return None
 
     def _net_icon_photo(self, icon_url, cache_list):
         if not icon_url:
@@ -1095,7 +1298,7 @@ class App:
             with urllib.request.urlopen(req, timeout=6) as r:
                 raw = r.read()
             img = Image.open(io.BytesIO(raw)).convert("RGBA")
-            img = img.resize((44, 44), Image.LANCZOS)
+            img = img.resize((46, 46), Image.LANCZOS)
             photo = ImageTk.PhotoImage(img)
         except Exception:
             return None
@@ -1106,6 +1309,7 @@ class App:
         state = self._search_tile_state.get(mod_id)
         if not state or state.get("busy"):
             return
+        state["chosen"] = self._selected_series(state)
         state["busy"] = True
         btn = state["button"]
         btn.config(state="disabled", text="...")
@@ -1117,7 +1321,7 @@ class App:
         dst = None
         try:
             versions = mod_catalog.fetch_modrinth_project_versions(mod["project"])
-            series = mod_catalog.series_of(self._current_version())
+            series = state.get("chosen") or mod_catalog.series_of(self._current_version())
             info = versions.get(series)
             if not info:
                 keys = sorted(versions, key=mod_catalog.version_sort_key, reverse=True)
@@ -1351,6 +1555,7 @@ class App:
             messagebox.showerror(APP_NAME, f"Не удалось обработать изображение:\n{e}")
             return
         self._status("Скин выбран — будет подставлен в игру.")
+        self._render_skin_preview()
 
     def _convert_skin(self, src, dst):
         try:
@@ -1368,6 +1573,81 @@ class App:
         photo = tk.PhotoImage(file=src)
         photo.write(dst, format="png")
 
+    def _render_skin_preview(self):
+        try:
+            canvas = self.skin_preview
+        except Exception:
+            return
+        canvas.delete("all")
+        skin_png = os.path.join(SKIN_DIR, "skin.png")
+        if not os.path.isfile(skin_png):
+            canvas.create_rectangle(6, 6, 106, 162, fill=BG3, outline=BG3)
+            canvas.create_text(56, 84, text="Скин не выбран", fill=MUTED,
+                               font=(FONT, 9), justify="center")
+            return
+        try:
+            from PIL import Image, ImageTk
+            im = Image.open(skin_png).convert("RGBA")
+        except Exception:
+            canvas.create_text(56, 84, text="Не удалось открыть скин", fill=MUTED,
+                               font=(FONT, 9), justify="center")
+            return
+        try:
+            w, h = im.size
+            if w != 64:
+                im = im.resize((64, 32 if h * 2 <= w else 64), Image.NEAREST)
+                w, h = im.size
+            legacy = h <= 32
+
+            def part(box):
+                return im.crop(box)
+
+            head = part((8, 8, 16, 16))
+            hat = part((40, 8, 48, 16))
+            body = part((20, 20, 28, 32))
+            r_arm = part((44, 20, 48, 32))
+            r_leg = part((4, 20, 8, 32))
+            if legacy:
+                l_arm = r_arm.transpose(Image.FLIP_LEFT_RIGHT)
+                l_leg = r_leg.transpose(Image.FLIP_LEFT_RIGHT)
+            else:
+                l_arm = part((36, 52, 40, 64))
+                l_leg = part((20, 52, 24, 64))
+                if not l_arm.getbbox():
+                    l_arm = r_arm.transpose(Image.FLIP_LEFT_RIGHT)
+                if not l_leg.getbbox():
+                    l_leg = r_leg.transpose(Image.FLIP_LEFT_RIGHT)
+
+            front = Image.new("RGBA", (16, 32), (0, 0, 0, 0))
+            front.paste(head, (4, 0))
+            if hat.getbbox():
+                front.alpha_composite(hat, (4, 0))
+            front.paste(body, (4, 8))
+            front.paste(r_arm, (0, 8))
+            front.paste(l_arm, (12, 8))
+            front.paste(r_leg, (4, 20))
+            front.paste(l_leg, (8, 20))
+            if not legacy:
+                overlays = (((20, 36, 28, 48), (4, 8)),
+                            ((44, 36, 48, 48), (0, 8)),
+                            ((52, 52, 56, 64), (12, 8)),
+                            ((4, 36, 8, 48), (4, 20)),
+                            ((4, 52, 8, 64), (8, 20)))
+                for box, pos in overlays:
+                    layer = part(box)
+                    if layer.getbbox():
+                        front.alpha_composite(layer, pos)
+
+            scale = 5
+            front = front.resize((16 * scale, 32 * scale), Image.NEAREST)
+            photo = ImageTk.PhotoImage(front)
+        except Exception:
+            canvas.create_text(56, 84, text="Не удалось собрать скин", fill=MUTED,
+                               font=(FONT, 9), justify="center")
+            return
+        self._skin_preview_photo = photo
+        canvas.create_image(56, 84, image=photo)
+
     def _reset_skin(self):
         if not messagebox.askyesno(APP_NAME, "Убрать скин?"):
             return
@@ -1375,45 +1655,12 @@ class App:
             os.remove(os.path.join(SKIN_DIR, "skin.png"))
         except Exception:
             pass
-        try:
-            shutil.rmtree(os.path.join(MC_DIR, "resourcepacks", SKIN_PACK))
-        except Exception:
-            pass
+        skin_pack.remove_skin_pack(MC_DIR)
         self._status("Скин убран.")
+        self._render_skin_preview()
 
     def _write_skin_pack(self, version, skin_png):
-        pack = os.path.join(MC_DIR, "resourcepacks", SKIN_PACK)
-        entity = os.path.join(pack, "assets", "minecraft", "textures", "entity")
-        os.makedirs(entity, exist_ok=True)
-        with open(os.path.join(pack, "pack.mcmeta"), "w", encoding="utf-8") as f:
-            json.dump({"pack": {"pack_format": pack_format_for(version),
-                                "description": "MC Lite Skin"}}, f)
-        for name in ("steve.png", "alex.png", "char.png"):
-            shutil.copyfile(skin_png, os.path.join(entity, name))
-        self._enable_skin_pack()
-
-    def _enable_skin_pack(self):
-        opts = os.path.join(MC_DIR, "options.txt")
-        lines = []
-        names = []
-        if os.path.isfile(opts):
-            with open(opts, encoding="utf-8", errors="replace") as f:
-                lines = f.read().splitlines()
-            for line in lines:
-                if line.startswith("resourcePacks:"):
-                    names = re.findall(r'"([^"]*)"', line)
-        if "MC Lite Skin" not in names:
-            names.append("MC Lite Skin")
-        packed = json.dumps(names)
-        found = False
-        for i, line in enumerate(lines):
-            if line.startswith("resourcePacks:"):
-                lines[i] = "resourcePacks:" + packed
-                found = True
-        if not found:
-            lines.append("resourcePacks:" + packed)
-        with open(opts, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines))
+        skin_pack.write_skin_pack(MC_DIR, version, skin_png)
 
     def _center(self):
         self.root.update_idletasks()
@@ -1619,7 +1866,7 @@ class App:
                 loader_versions = loader.get_loader_versions(version, stable_only=True)
                 if not loader_versions:
                     raise RuntimeError(f"{LOADER_NAMES[loader_id]} не поддерживает версию {version}")
-                lv = loader_versions[0] if loader_id != "forge" else loader_versions[-1]
+                lv = loader_versions[0]
                 launch_version = loader.get_installed_version(version, lv)
                 installed = {v["id"] for v in mll.utils.get_installed_versions(MC_DIR)}
                 if launch_version not in installed:
@@ -1635,6 +1882,7 @@ class App:
             self.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                             text=True, encoding="utf-8", errors="replace",
                                             bufsize=1, cwd=MC_DIR, creationflags=subprocess.CREATE_NO_WINDOW)
+            self._mark_session_start()
             threading.Thread(target=self._watch_game_window, args=(self.process,), daemon=True).start()
             threading.Thread(target=self._read_output, args=(self.process,), daemon=True).start()
             self.process.wait()
@@ -1645,11 +1893,26 @@ class App:
             self._status("Ошибка запуска.")
             self.root.after(0, messagebox.showerror, APP_NAME, f"Ошибка запуска:\n{e}")
         finally:
+            self._mark_session_end()
             self.root.after(0, self._set_ui_running, False)
 
     def _ensure_java(self, version):
         required = self._required_java(version)
-        java, ver = find_java()
+        # Старые версии (1.7–1.16 и Forge) падают на слишком новой Java:
+        # берём самую старую подходящую, а не самую новую.
+        low = None
+        high = None
+        for c, v in find_java_candidates():
+            if v is None:
+                continue
+            if v >= required and (low is None or v < low[1]):
+                low = (c, v)
+            if high is None or v > high[1]:
+                high = (c, v)
+        if low is not None:
+            return low[0]
+        java = high[0] if high is not None else None
+        ver = high[1] if high is not None else None
         if java and ver is not None and ver >= required:
             return java
         name = None
@@ -1727,6 +1990,50 @@ class App:
 
     def _status(self, text):
         self.root.after(0, lambda: self.status_var.set(text))
+
+    def _load_playtime(self):
+        try:
+            with open(PLAYTIME_PATH, "r", encoding="utf-8") as f:
+                return float(json.load(f).get("seconds", 0))
+        except Exception:
+            return 0.0
+
+    def _save_playtime(self):
+        try:
+            os.makedirs(MC_DIR, exist_ok=True)
+            with open(PLAYTIME_PATH, "w", encoding="utf-8") as f:
+                json.dump({"seconds": self._playtime_total}, f)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _fmt_playtime(seconds):
+        total = int(seconds or 0)
+        h, rem = divmod(total, 3600)
+        m, s = divmod(rem, 60)
+        parts = []
+        if h:
+            parts.append(f"{h} ч")
+        if m or h:
+            parts.append(f"{m} мин")
+        if not parts:
+            parts.append(f"{s} сек")
+        return "Время в игре: " + " ".join(parts)
+
+    def _refresh_playtime_label(self):
+        if hasattr(self, "playtime_var"):
+            self.playtime_var.set(self._fmt_playtime(self._playtime_total))
+
+    def _mark_session_start(self):
+        self._session_start = time.time()
+
+    def _mark_session_end(self):
+        if self._session_start is None:
+            return
+        self._playtime_total += max(0.0, time.time() - self._session_start)
+        self._session_start = None
+        self._save_playtime()
+        self.root.after(0, self._refresh_playtime_label)
 
     def _show_progress(self, show):
         def job():

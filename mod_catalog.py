@@ -17,6 +17,7 @@ PINNED_MODS = [
         "source": "modrinth",
         "project": "embeddium",
         "note": "Аналог Sodium (Forge / NeoForge)",
+        "loaders": ["forge", "neoforge"],
         "icon_b64": "iVBORw0KGgoAAAANSUhEUgAAACwAAAAsCAYAAAAehFoBAAAFsklEQVR4nNVYS28cRRD+qnt2N2slwSYyCYFI4SEhI4UbB5D4BVw4gMRP4MCNK/+E14FDTnDiD3AkQkIQYoGUCCSI8yBOjB3vc6YLVXX37Mzs7O54vRFxWeOZna6u+qa6uvrrpmsffcMMQC4D1jtAoPBO7hPxrdW3i4UX9C16is/194QNgTiCZRBMDngatAu/6BhgzfEAm/w3AWQ81Gh/Cpr/mKMJhX5y8Ryd6nP9PSEKLwRvbJyJ6ahgMcP58pIQ1Q3RRJh9GuQf5t+CmVHsK3pepxkoXtJusshwPQhx1ERv9XbnhzcYafZ+mdw+ut0GgJ8uSco5NEdKasefPGXh2QWkIklT3y5Nc9urnPUiTAybWKwkwtKejcd44f0rWLu0Dk4dYBuGY5FIRbAGowd93L56vVGQF1YJFQesXd7A2ZfP4UnIaL2HHWZwg/RsFGEyDDdKwY4BuXSq1iwyTRayop6wGBnBwUjLWZP5lCxS0SpIBqaVgAwBcs1TbiJUfjAtoQTCYyJnOG6EiZDu95E+6sFlTqMiwFvr3VJUslGK9GDo+4hrx7CnW7Cn2rmOEKzxv31A5zCDjMF4rw8WHqOmaBnARXbFsK0Ed67ewL3AizhzSNY7ePWTd2C7LQUm0d///T7++uJHtLodZX3DwwEufngFm29fznVc6vDHZz8gvdMHtW1O5gR4Gaws3Rr/Eq7CpJuw4ipgbR1nSLWZwSnDjmtqp2O4QQZnhRNkcMMMyKaHmEeMbOBgHGkagyJfKIKdZuPy3gMm5+llBCsEWX9HkRSQ/36SeJZZMzKSCtZquhAcJGh1I0hW9EjLo7gqD2qILBciTln+O9GJpNzSBE4sHWwIrnosRzznIjVAwveQophNhlj1hJXJYlHUDfajr2g04hHAhRoTGosIYh7VBXNe7nsxRiYSNWNq6ru+Qni66alnslpusNgO5QCamiqXuubkp+RxTrOWp9kKnOtF7ns0Dr00YJ/7VYPxogqo+tp+ZN+r58NlALRyGroQ8Kzxnw1kErVldtjzJOzpzMxhiQ6zMv8lA6ZMq2AdqdFqHqqAm1X+jNdplhIxaD77Z+RwUamy8umpi5mqgP4bhdlJIng9Uk5RLV+BB2vJqzurqBIgU1r5THkSTGa5f5Yl0+eiqOpd1pfeEK3NLkxHyvjEOKVh5SpgZCFLUYQMWYtT588g6wVKGf5Q8htxxHeiYfVeyeEqjwjjbiQNGGwc5Dih88oGzr/3+lSlGOw+BnMY6rCEjx/2cmuxZDz37ha6W+fgnAML7zBCLXOtmqklOeSKKTG3sMKlGTY/2EL30jNg5zRCxgaj+vX+Iwe/PYKx1h8pMimH7t3a1W2VbIWim/azp/DSx2+hf2df00g+6t7X1ytp4copErhNOPkp5k3x63ykiAmdzdPoXjhTGOtAHGTIrcHB9l0M/txDInRTnRkkbYvh3z3s/bSDjTdfzHUjfehePOs9hg3oZAUM/KEGvP/sOIT5oV241IAnQDzKlNNqTgpYsSnbJWswfHCIf769CZO0QxR9EBiEVqeFh9/dwuD2vger3aW/tyU23SgrrDriT8BG33FF8r/D7kwmVCHpjUw2LrxjmLb1FUCHNmyVDOHw5i52Pv8F2cEY1BYgBVvw21weZtj58mfsb98NcQgjZ40+i+0YwfyviENtia6mRKR4BSlxYV9FRrt9JGstH5WMMbz/GP0b93GwvQvjLEzL+iEvdWRfm5ME3Mtw96tfsf/aDs688Tw6F9YAAWoI6YM+rNT36lxSHMWSQ6Bbn37vrVZAlh37YdSzZM0oP4xa/KW0xbSb6scTx8G87kIkJWTjKakW9wPSpuV7wZ4uR7Rg0YnGvTYhWZNqEPI4mKj90kqb6QaXoV9syss3reIgpUb0jGIZccc7NZrDJZ5OSZbhpP+nGJwwMThhkpy0lEhWf5r+ZCU5aRH+DyBc+8fs6tEtAAAAAElFTkSuQmCC",
         "icon_url": "https://cdn.modrinth.com/data/bWrNNfkb/2456e7df3fc1e84360e2ce1c27dfd08c5ea3bc86.png",
         "pinned": True,
@@ -28,6 +29,7 @@ PINNED_MODS = [
         "source": "modrinth",
         "project": "zoomify",
         "note": "Зум с настройками (Fabric / Quilt)",
+        "loaders": ["fabric"],
         "icon_b64": "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",
         "icon_url": "https://cdn.modrinth.com/data/w7ThRbJb/8e698889a2eb2292f3922f5e3df5696d744b8bc3.png",
         "pinned": True,
@@ -37,8 +39,9 @@ PINNED_MODS = [
         "name": "Distant Horizons",
         "color": "#06b6d4",
         "source": "modrinth",
-        "project": "distant-horizons",
+        "project": "distanthorizons",
         "note": "Отрисовка дальних чанков (Forge / Fabric)",
+        "loaders": ["forge", "fabric"],
         "icon_b64": "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",
         "icon_url": "https://cdn.modrinth.com/data/u6dRKJwZ/3bd1528659d64027787eb982d64a274ccfe18090.png",
         "pinned": True,
@@ -50,6 +53,7 @@ PINNED_MODS = [
         "source": "modrinth",
         "project": "voxy",
         "note": "Быстрая LOD-генерация (Fabric)",
+        "loaders": ["fabric"],
         "icon_b64": "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",
         "icon_url": "https://cdn.modrinth.com/data/ygA2O4t2/e18288ce4cfd474bdf001272719601d36d2db170.png",
         "pinned": True,
@@ -61,6 +65,7 @@ PINNED_MODS = [
         "source": "modrinth",
         "project": "sodium",
         "note": "Оптимизация рендера (Fabric)",
+        "loaders": ["fabric"],
         "icon_b64": "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",
         "icon_url": "https://cdn.modrinth.com/data/AANobbMI/6078bf01a3501a3297a76041a9db946cb32cf315.png",
         "pinned": True,
@@ -71,6 +76,7 @@ PINNED_MODS = [
         "color": "#e05d3f",
         "source": "optifine",
         "note": "Оптимизация и шейдеры (Forge / ваниль)",
+        "loaders": ["forge"],
         "icon_b64": "iVBORw0KGgoAAAANSUhEUgAAACwAAAAsCAYAAAAehFoBAAABgUlEQVR4nO3Zv0sbYRzH8fd9vAimaaWCDTiYLro5dq0duti6uKmDc7dCnewfUBwc6lQHodAl4pBNsLo41KmYSUEMVIPYIoUGovgjCb3iiRFxq4TkA76W5/s8d8/xfR6+HMdzQRRFOBFmwqugOPGi5bc682UtsNthYUaYEWaEGWFGmBFmhBlhRpgRZoQZYUa4fg//r9TzIR6+HCGq1QjCkKOVHMffluNrvfNfOf+xXb/3NL9OeXmRpiXcMfCM1OBrDqff8ffkGCVTPJmcplb6zdnWRryIww9vaZmSePRqjFL2U5zshYu2tDBH5/A4jaK7TE709FIpFm6MVfZ2SPRkaNkaviUIrsMwJP1+tt7/83mG6q99mpZw9WeR9qf9nBc262PtmT4qB7txHLVaDZeXFng8+gYlH1w+LJmK++WlLI0S3mXy6eZ32rq6SU99JKpWL19rqznOtvI0SnB18nN/LtEgwowwI8wIM8KMMCPMCDPCjDAjzAgzwowwI8wEbr9u/wFhR2vrc2mSdwAAAABJRU5ErkJggg==",
         "icon_url": "",
         "pinned": True,
@@ -121,6 +127,14 @@ def fetch_modrinth_project_versions(project_slug):
             rel = v.get("version_type") == "release"
             date = v.get("date_published") or ""
             loaders = v.get("loaders") or []
+            deps = [
+                {
+                    "project_id": d.get("project_id"),
+                    "version_id": d.get("version_id"),
+                    "type": d.get("dependency_type"),
+                }
+                for d in v.get("dependencies") or []
+            ]
             for mc in v.get("game_versions") or []:
                 if not _RELEASE_VER.match(mc):
                     continue
@@ -133,6 +147,7 @@ def fetch_modrinth_project_versions(project_slug):
                         "url": f["url"],
                         "size": f.get("size"),
                         "loaders": loaders,
+                        "dependencies": deps,
                     },
                     rel,
                     date,
@@ -142,7 +157,38 @@ def fetch_modrinth_project_versions(project_slug):
         return {}
 
 
-def search_modrinth_mods(query, limit=12, index="relevance", loader=None):
+def fetch_modrinth_version(version_id):
+    """Возвращает информацию о конкретной версии мода по её ID."""
+    url = f"https://api.modrinth.com/v2/version/{version_id}"
+    try:
+        raw = _get(url)
+        v = json.loads(raw)
+        files = v.get("files") or []
+        if not files:
+            return None
+        f = next((x for x in files if x.get("primary")), files[0])
+        if not f.get("url") or not f.get("filename"):
+            return None
+        deps = [
+            {
+                "project_id": d.get("project_id"),
+                "version_id": d.get("version_id"),
+                "type": d.get("dependency_type"),
+            }
+            for d in v.get("dependencies") or []
+        ]
+        return {
+            "filename": f["filename"],
+            "url": f["url"],
+            "size": f.get("size"),
+            "loaders": v.get("loaders") or [],
+            "dependencies": deps,
+        }
+    except Exception:
+        return None
+
+
+def search_modrinth_mods(query, limit=12, index="relevance", loader=None, series=None):
     encoded_query = urllib.parse.quote((query or "").strip())
     facets = ['["project_type:mod"]']
     if loader and loader != "all":
@@ -162,6 +208,7 @@ def search_modrinth_mods(query, limit=12, index="relevance", loader=None):
             description = h.get("description") or ""
             icon_url = h.get("icon_url") or ""
             categories = h.get("categories") or []
+            versions = h.get("versions") or []
             results.append(
                 {
                     "id": mod_id,
@@ -173,9 +220,13 @@ def search_modrinth_mods(query, limit=12, index="relevance", loader=None):
                     "full_desc": description,
                     "icon_url": icon_url,
                     "categories": categories,
+                    "versions": versions,
+                    "compatible": bool(series and any(series_of(v) == series for v in versions)),
                     "pinned": False,
                 }
             )
+        if series:
+            results.sort(key=lambda r: (not r["compatible"], r["name"].lower()))
         return results
     except Exception:
         return []
@@ -204,15 +255,21 @@ def fetch_optifine():
 def fetch_catalog():
     out = {}
     for mod in PINNED_MODS:
-        if mod["source"] == "modrinth":
-            out[mod["id"]] = fetch_modrinth_project_versions(mod["project"])
-        elif mod["source"] == "optifine":
-            out[mod["id"]] = fetch_optifine()
+        try:
+            if mod["source"] == "modrinth":
+                versions = fetch_modrinth_project_versions(mod["project"])
+                if not versions:
+                    versions = fetch_modrinth_project_versions(mod["project"])
+                out[mod["id"]] = versions
+            elif mod["source"] == "optifine":
+                out[mod["id"]] = fetch_optifine()
+        except Exception:
+            out[mod["id"]] = {}
     return out
 
 
 def cache_path(mc_dir):
-    return os.path.join(mc_dir, "mod_catalog_v13.json")
+    return os.path.join(mc_dir, "mod_catalog_v13_1.json")
 
 
 def load_cache(mc_dir):
@@ -228,8 +285,11 @@ def load_cache(mc_dir):
 
 def save_cache(mc_dir, catalog):
     try:
+        clean = {k: v for k, v in (catalog or {}).items() if v}
+        if not clean:
+            return
         os.makedirs(mc_dir, exist_ok=True)
         with open(cache_path(mc_dir), "w", encoding="utf-8") as f:
-            json.dump({"ts": time.time(), "catalog": catalog}, f, ensure_ascii=False)
+            json.dump({"ts": time.time(), "catalog": clean}, f, ensure_ascii=False)
     except Exception:
         pass

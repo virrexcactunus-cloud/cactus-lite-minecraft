@@ -1,0 +1,40 @@
+// Единая палитра: текущий тёмный дизайн Cactus Lite + токены WinUI 3 (Fluent).
+export global Theme {
+    // Поверхности (WinUI: Mica Base / Layer / Card)
+    out property <color> bg: #0f1215;
+    out property <color> layer: #1a1f25;
+    out property <color> card: #232a31;
+    out property <color> card-hover: #2a323a;
+    out property <color> stroke: #2c343c;
+    out property <color> console-bg: #0a0c0e;
+
+    // Текст
+    out property <color> fg: #e8edf2;
+    out property <color> muted: #8b949e;
+    out property <color> on-accent: #06130b;
+    out property <color> console-fg: #9fb3c8;
+
+    // Акцент (фирменный зелёный вместо системного синего WinUI)
+    out property <color> accent: #22c55e;
+    out property <color> accent-dark: #16a34a;
+    out property <color> accent-soft: #22c55e26;
+
+    // Геометрия WinUI 3
+    out property <length> radius: 8px;
+    out property <length> radius-small: 4px;
+    out property <length> stroke-width: 1px;
+    out property <length> gap: 12px;
+    out property <length> page-padding: 24px;
+    out property <length> nav-width: 200px;
+    out property <length> nav-item-height: 40px;
+
+    // Типографика WinUI 3 (Segoe UI Variable)
+    // пустая строка = системный шрифт платформы: Segoe UI на Windows,
+    // San Francisco на macOS, системный sans-serif на Linux
+    out property <string> font: "";
+    out property <length> title-size: 28px;
+    out property <length> subtitle-size: 20px;
+    out property <length> body-strong-size: 15px;
+    out property <length> body-size: 14px;
+    out property <length> caption-size: 12px;
+}
