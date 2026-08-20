@@ -1,16 +1,28 @@
 # -*- mode: python ; coding: utf-8 -*-
+"""PyInstaller build recipe for Cactus Lite Minecraft."""
 
+block_cipher = None
 
 a = Analysis(
     ['launcher.py'],
     pathex=[],
     binaries=[],
-    datas=[('icon.ico', '.'), ('icon.png', '.')],
-    hiddenimports=[],
+    datas=[
+        ('assets/icon.ico', 'assets'),
+        ('assets/icon.png', 'assets'),
+        ('assets/mod_icons.json', 'assets'),
+    ],
+    hiddenimports=[
+        'cactus_lite',
+        'minecraft_launcher_lib',
+        'wx',
+        'wx.adv',
+        'PIL.Image',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['numpy', 'pytest', 'setuptools', 'pip'],
     noarchive=False,
     optimize=0,
 )
@@ -35,5 +47,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['icon.ico'],
+    icon=['assets/icon.ico'],
 )
